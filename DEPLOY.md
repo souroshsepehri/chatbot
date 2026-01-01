@@ -57,12 +57,22 @@ npm install
 npm run build
 cd ../..
 
-# Start با PM2
-pm2 start pm2.ecosystem.config.js
+# Start با PM2 (idempotent - safe to run multiple times)
+bash scripts/pm2-ensure.sh
 
 # بررسی status
 pm2 status
 pm2 logs
+```
+
+### 4.1. After Git Pull (Updates)
+```bash
+# After pulling updates, ensure both services are running
+bash scripts/pm2-ensure.sh
+
+# Verify services
+curl 127.0.0.1:8000/health
+curl 127.0.0.1:3000
 ```
 
 ### 5. Nginx
@@ -90,8 +100,14 @@ sudo systemctl reload nginx
 
 ### PM2 کار نمی‌کند؟
 ```bash
+# Use the ensure script to fix missing processes
+bash scripts/pm2-ensure.sh
+
+# Check logs
 pm2 logs chatbot-backend
 pm2 logs chatbot-frontend
+
+# Manual restart if needed
 pm2 restart all
 ```
 
@@ -132,6 +148,8 @@ sudo systemctl reload nginx
 tail -f logs/app.log
 pm2 logs chatbot-backend
 ```
+
+
 
 
 
