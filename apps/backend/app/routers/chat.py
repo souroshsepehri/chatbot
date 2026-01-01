@@ -8,6 +8,7 @@ from app.services.retrieval import RetrievalService
 from app.services.answer_guard import AnswerGuardService
 from app.services.llm import LLMService
 from app.services.intent_matcher import IntentMatcherService
+from app.services.greeting_detector import GreetingDetectorService
 from app.core.config import settings
 import uuid
 import logging
@@ -42,16 +43,48 @@ async def chat(
         session_id = request.session_id or str(uuid.uuid4())
         
         # TEST: Uncomment the line below to test exception handling
-        # raise ValueError("Test exception for error handling")
-        
-        # Check if this is the first message in the session (for greeting)
-        is_new_session = not request.session_id or db.query(ChatLog).filter(
-            ChatLog.session_id == session_id
-        ).first() is None
+        # raise ValueError("Test exception for exception handling")
         
         # Check for intent match (for logging only - not used for answering)
         matched_intent = IntentMatcherService.match_intent(db, request.message)
         intent_name = matched_intent.name if matched_intent else None
+        
+        # Check if message is a greeting-only message
+        is_greeting_only = GreetingDetectorService.is_greeting(request.message)
+        
+        if is_greeting_only:
+            # Return greeting response for greeting-only messages
+            greeting_response = f"{settings.GREETING_MESSAGE}\n\nچطور می‌تونم کمکتون کنم؟"
+            
+            # Log greeting interaction
+            logger.info(
+                "Greeting detected",
+                extra={
+                    "session_id": session_id,
+                    "user_message": request.message[:100],
+                    "is_greeting": True,
+                }
+            )
+            
+            chat_log = ChatLog(
+                session_id=session_id,
+                user_message=request.message,
+                bot_message=greeting_response,
+                sources_json={"kb_ids": [], "website_page_ids": [], "sources": []},
+                refused="false",
+                intent=intent_name
+            )
+            db.add(chat_log)
+            db.commit()
+            
+            return ChatResponse(
+                session_id=session_id,
+                answer=greeting_response,
+                sources=[],
+                refused=False,
+                openai_called=False,
+                debug={"is_greeting": True} if settings.ENV == "development" else None
+            )
         
         # STRICT: Bot only answers from KB or website sources, never from intents
         # Retrieve relevant sources
@@ -84,13 +117,8 @@ async def chat(
                 }
             )
             
-            # If this is a new session, just show greeting without refusal message
-            if is_new_session:
-                refusal_with_greeting = settings.GREETING_MESSAGE
-                refused = False  # Don't mark as refused for new sessions
-            else:
-                refusal_with_greeting = refusal_message
-                refused = True
+            # Always refuse when no sources (strict gating)
+            refused = True
             
             # Build sources JSON for refusal (empty sources)
             sources_json = {
@@ -102,9 +130,9 @@ async def chat(
             chat_log = ChatLog(
                 session_id=session_id,
                 user_message=request.message,
-                bot_message=refusal_with_greeting,
+                bot_message=refusal_message,
                 sources_json=sources_json,
-                refused="true" if refused else "false",
+                refused="true",
                 intent=intent_name
             )
             db.add(chat_log)
@@ -120,9 +148,9 @@ async def chat(
             
             return ChatResponse(
                 session_id=session_id,
-                answer=refusal_with_greeting,
+                answer=refusal_message,
                 sources=[],
-                refused=refused,
+                refused=True,
                 openai_called=openai_called,
                 missing_info={
                     "query": request.message,
@@ -131,7 +159,7 @@ async def chat(
                     "max_confidence": retrieval_result["max_confidence"],
                     "reason": refusal_reason,
                     "threshold": settings.MIN_CONFIDENCE_SCORE
-                } if refused else None,
+                },
                 debug=debug_info
             )
         
@@ -175,10 +203,6 @@ async def chat(
         )
         
         answer = llm_service.generate_answer(request.message, context, sources, request_id=request_id)
-        
-        # Include greeting if this is a new session
-        if is_new_session:
-            answer = f"{settings.GREETING_MESSAGE}\n\n{answer}"
         
         # Build sources JSON for logging (include all source info)
         sources_json = {
