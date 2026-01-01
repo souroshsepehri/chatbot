@@ -101,74 +101,34 @@ echo "If they don't match, STOP and fix your DNS A record."
 ## Step B: Install Nginx
 
 ```bash
-# Update package list
 sudo apt update
-
-# Install Nginx
 sudo apt install -y nginx
-
-# Enable and start Nginx
 sudo systemctl enable --now nginx
-
-# Verify Nginx is running
-sudo systemctl status nginx
 ```
 
 ---
 
 ## Step C: Apply Nginx Configuration
 
-### C.1. Copy Configuration File
-
 ```bash
-# Copy the config file
 sudo cp deploy/nginx/chatbot.zimmerai.com.conf /etc/nginx/sites-available/chatbot.zimmerai.com
-```
-
-### C.2. Enable the Site
-
-```bash
-# Create symlink to enable the site
 sudo ln -sf /etc/nginx/sites-available/chatbot.zimmerai.com /etc/nginx/sites-enabled/chatbot.zimmerai.com
-
-# Remove default Nginx site (optional, but recommended)
+# optional disable default site if enabled
 sudo rm -f /etc/nginx/sites-enabled/default
-```
-
-### C.3. Test and Reload Nginx
-
-```bash
-# Test Nginx configuration for syntax errors
 sudo nginx -t
-```
-
-**Expected output:**
-```
-nginx: the configuration file /etc/nginx/nginx.conf syntax is ok
-nginx: nginx: configuration file /etc/nginx/nginx.conf test is successful
-```
-
-**If test passes, reload Nginx:**
-```bash
 sudo systemctl reload nginx
 ```
 
 ---
 
-## Step D: Install SSL Certificate with Certbot
+## Step D: Install Certbot and Issue SSL
 
-### D.1. Install Certbot
+**Replace `<EMAIL>` with your email address:**
 
 ```bash
-# Install Certbot and Nginx plugin
 sudo apt install -y certbot python3-certbot-nginx
-```
-
-### D.2. Obtain SSL Certificate
-
-```bash
-# Obtain SSL certificate (certbot will automatically configure Nginx)
 sudo certbot --nginx -d chatbot.zimmerai.com -m <EMAIL> --agree-tos --redirect
+sudo certbot renew --dry-run
 ```
 
 **Example:**
@@ -176,134 +136,27 @@ sudo certbot --nginx -d chatbot.zimmerai.com -m <EMAIL> --agree-tos --redirect
 sudo certbot --nginx -d chatbot.zimmerai.com -m admin@zimmerai.com --agree-tos --redirect
 ```
 
-**What this does:**
-- Obtains SSL certificate from Let's Encrypt
-- Automatically configures Nginx HTTPS server block
-- Sets up HTTP to HTTPS redirect
-- Configures automatic renewal
-
-### D.3. Verify Certificate Renewal
-
-```bash
-# Test certificate renewal (dry run)
-sudo certbot renew --dry-run
-```
-
-**Expected output:**
-```
-Congratulations, all renewals succeeded. The following certs have been renewed:
-  /etc/letsencrypt/live/chatbot.zimmerai.com/fullchain.pem (success)
-```
-
-**Note:** Certbot automatically sets up a systemd timer for renewal. Verify it's enabled:
-```bash
-sudo systemctl status certbot.timer
-```
-
 ---
 
-## Step E: Firewall Hardening with UFW (Optional but Recommended)
-
-**Important:** Backend and frontend already bind to `127.0.0.1`, so ports 3000/8000 are not publicly reachable anyway. Firewall provides additional security.
-
-### E.1. Configure UFW Rules
+## Step E: Post-Deployment Checks
 
 ```bash
-# Allow OpenSSH (CRITICAL - do this first!)
-sudo ufw allow OpenSSH
-
-# Allow Nginx (HTTP and HTTPS)
-sudo ufw allow 'Nginx Full'
-
-# Enable firewall
-sudo ufw --force enable
-
-# Verify rules
-sudo ufw status numbered
-```
-
-**Expected firewall rules:**
-- ✅ OpenSSH (port 22) - allowed
-- ✅ Nginx Full (ports 80, 443) - allowed
-- Note: Ports 3000/8000 are not publicly reachable (bind to 127.0.0.1)
-
----
-
-## Step F: Post-Deployment Verification
-
-### F.1. Verify HTTP Redirect
-
-```bash
-# Check HTTP redirects to HTTPS
 curl -I http://chatbot.zimmerai.com
-```
-
-**Expected output:**
-```
-HTTP/1.1 301 Moved Permanently
-Location: https://chatbot.zimmerai.com/
-```
-
-### F.2. Verify HTTPS Frontend
-
-```bash
-# Check HTTPS frontend
 curl -I https://chatbot.zimmerai.com
-```
-
-**Expected output:**
-```
-HTTP/2 200
-...
-X-Content-Type-Options: nosniff
-X-Frame-Options: DENY
-Referrer-Policy: strict-origin-when-cross-origin
-Strict-Transport-Security: max-age=31536000; includeSubDomains
-```
-
-### F.3. Verify Backend API
-
-```bash
-# Check backend health endpoint via Nginx
 curl -I https://chatbot.zimmerai.com/api/health
-```
-
-**Expected output:**
-```
-HTTP/2 200
-...
-```
-
-### F.4. Verify PM2 Processes
-
-```bash
-# Check PM2 processes are running
 pm2 status
 ```
 
-**Expected output:**
-```
-┌─────┬──────────────────────┬─────────┬─────────┬──────────┐
-│ id  │ name                 │ status  │ restart │ uptime   │
-├─────┼──────────────────────┼─────────┼─────────┼──────────┤
-│ 0   │ chatbot-backend      │ online  │ 0       │ 2h       │
-│ 1   │ chatbot-frontend     │ online  │ 0       │ 2h       │
-└─────┴──────────────────────┴─────────┴─────────┴──────────┘
-```
+---
 
-### F.5. Test Full Stack
+## Step F: UFW Firewall Hardening (Optional but Recommended)
+
+**Note:** Backend and frontend bind to `127.0.0.1`, so ports 3000/8000 are not publicly reachable anyway.
 
 ```bash
-# Test frontend
-curl https://chatbot.zimmerai.com
-
-# Test backend API
-curl https://chatbot.zimmerai.com/api/health
-
-# Test chat endpoint (should return JSON)
-curl -X POST https://chatbot.zimmerai.com/api/chat \
-  -H "Content-Type: application/json" \
-  -d '{"message": "test"}'
+sudo ufw allow OpenSSH
+sudo ufw allow 'Nginx Full'
+sudo ufw --force enable
 ```
 
 ---
