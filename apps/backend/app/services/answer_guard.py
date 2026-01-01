@@ -6,30 +6,31 @@ from app.core.config import settings
 class AnswerGuardService:
     """Strict guard to ensure answers ONLY come from retrieved sources"""
     
-    REFUSAL_MESSAGE = "پاسخی برای این سوال ندارم"
+    REFUSAL_MESSAGE = "اطلاعات کافی در پایگاه دانش یا صفحات وب‌سایت ندارم. لطفاً سوال خود را به شکل دیگری مطرح کنید یا با پشتیبانی تماس بگیرید."
     
     @staticmethod
     def should_refuse(retrieval_result: Dict[str, Any]) -> bool:
         """
         Determine if we should refuse to answer.
         STRICT RULES:
-        - Refuse if no results found
+        - Refuse if total sources < MIN_SOURCES
         - Refuse if max confidence below threshold
-        - Refuse if retrieval error occurred
+        - Refuse if no results found
         """
-        # No results at all
-        if not retrieval_result["has_results"]:
-            return True
-        
-        # Confidence too low (below strict threshold)
-        if retrieval_result["max_confidence"] < settings.MIN_CONFIDENCE_SCORE:
-            return True
-        
-        # Check if we have valid results (should not happen if has_results is True, but double-check)
         kb_results = retrieval_result.get("kb_results", [])
         website_results = retrieval_result.get("website_results", [])
+        total_sources = len(kb_results) + len(website_results)
         
-        if not kb_results and not website_results:
+        # Refuse if not enough sources
+        if total_sources < settings.MIN_SOURCES:
+            return True
+        
+        # Refuse if max confidence below threshold
+        if retrieval_result.get("max_confidence", 0.0) < settings.MIN_CONFIDENCE_SCORE:
+            return True
+        
+        # No results at all
+        if not retrieval_result.get("has_results", False):
             return True
         
         return False

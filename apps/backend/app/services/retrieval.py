@@ -7,6 +7,7 @@ from app.models.website_source import WebsiteSource
 from app.core.config import settings
 import re
 import unicodedata
+import difflib
 
 
 class RetrievalService:
@@ -138,15 +139,20 @@ class RetrievalService:
         else:
             overlap_ratio = 0.0
         
+        # 6. Difflib ratio (sequence matching for fuzzy similarity)
+        difflib_ratio = difflib.SequenceMatcher(None, query_norm, text_norm).ratio()
+        
         # Weighted combination:
-        # - Token Jaccard: 40% (most important for semantic similarity)
-        # - Trigram Jaccard: 30% (catches paraphrases and word order variations)
-        # - Substring: 20% (catches partial matches)
+        # - Token Jaccard: 35% (most important for semantic similarity)
+        # - Trigram Jaccard: 25% (catches paraphrases and word order variations)
+        # - Difflib ratio: 20% (sequence matching for fuzzy similarity)
+        # - Substring: 10% (catches partial matches)
         # - Overlap ratio: 10% (ensures most query words appear)
         hybrid_score = (
-            token_jaccard * 0.40 +
-            trigram_jaccard * 0.30 +
-            substring_score * 0.20 +
+            token_jaccard * 0.35 +
+            trigram_jaccard * 0.25 +
+            difflib_ratio * 0.20 +
+            substring_score * 0.10 +
             overlap_ratio * 0.10
         )
         

@@ -36,7 +36,8 @@ class Settings(BaseSettings):
     # Retrieval
     KB_TOP_K: int = 5
     WEBSITE_TOP_K: int = 3
-    MIN_CONFIDENCE_SCORE: float = 0.70  # Strict threshold: only answer if similarity >= 0.70
+    MIN_CONFIDENCE_SCORE: float = 0.72  # Strict threshold: only answer if similarity >= 0.72
+    MIN_SOURCES: int = 1  # Minimum number of sources required to answer
     
     # Rate Limiting
     CHAT_RATE_LIMIT: int = 10

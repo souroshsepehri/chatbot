@@ -191,3 +191,5 @@ grep "website_fetcher" logs/app.log | jq 'select(.level == "ERROR")'
 
 
 
+
+

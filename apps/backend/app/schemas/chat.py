@@ -4,10 +4,12 @@ from app.core.config import settings
 
 
 class SourceInfo(BaseModel):
-    type: str  # "kb" or "website"
-    id: int
+    type: str  # "kb" or "web"
+    id: Optional[int] = None
     title: Optional[str] = None
     url: Optional[str] = None
+    snippet: Optional[str] = None  # Relevant snippet from source
+    score: Optional[float] = None  # Similarity score (0.0 to 1.0)
 
 
 class ChatRequest(BaseModel):

@@ -15,16 +15,23 @@ class LLMService:
 
 قوانین STRICT (بدون استثنا):
 1. فقط از اطلاعات ارائه شده در متن زیر استفاده کنید
-2. اگر پاسخ به سوال در متن زیر نیست، باید بگویید: "پاسخی برای این سوال ندارم"
+2. اگر پاسخ به سوال در متن زیر نیست، باید بگویید: "در منابع موجود نیست"
 3. از دانش عمومی استفاده نکنید - حتی اگر می‌دانید پاسخ چیست
 4. فرضیات نسازید - فقط از متن ارائه شده استفاده کنید
 5. توضیحات اضافی یا پیش‌فرض‌ها اضافه نکنید
-6. اگر متن شامل اطلاعات کافی برای پاسخ نیست، صراحتاً بگویید "پاسخی برای این سوال ندارم"
+6. اگر متن شامل اطلاعات کافی برای پاسخ نیست، صراحتاً بگویید "در منابع موجود نیست"
+7. باید منابع را در پاسخ خود ذکر کنید (مثلاً "طبق پایگاه دانش" یا "بر اساس صفحه وب‌سایت [URL]")
 
 متن:
 {context}
 
-یادآوری CRITICAL: اگر نمی‌توانید پاسخ را مستقیماً از متن بالا استخراج کنید، باید بگویید "پاسخی برای این سوال ندارم" - هیچ استثنایی وجود ندارد."""
+منابع استفاده شده:
+{sources_list}
+
+یادآوری CRITICAL: 
+- اگر نمی‌توانید پاسخ را مستقیماً از متن بالا استخراج کنید، باید بگویید "در منابع موجود نیست"
+- همیشه منابع را در پاسخ خود ذکر کنید
+- هیچ استثنایی وجود ندارد - فقط از منابع ارائه شده استفاده کنید."""
     
     def __init__(self):
         if not settings.OPENAI_API_KEY:
@@ -43,7 +50,20 @@ class LLMService:
     ) -> str:
         """Generate answer using OpenAI with strict context enforcement"""
         try:
-            system_prompt = self.SYSTEM_PROMPT.format(context=context)
+            # Build sources list for prompt
+            sources_list = []
+            for i, source in enumerate(sources, 1):
+                if source.type == "kb":
+                    sources_list.append(f"{i}. پایگاه دانش: {source.title} (ID: {source.id})")
+                elif source.type == "web":
+                    sources_list.append(f"{i}. وب‌سایت: {source.title} (URL: {source.url})")
+            
+            sources_text = "\n".join(sources_list) if sources_list else "هیچ منبعی یافت نشد"
+            
+            system_prompt = self.SYSTEM_PROMPT.format(
+                context=context,
+                sources_list=sources_text
+            )
             
             logger.info(
                 "Calling OpenAI API",
@@ -97,7 +117,7 @@ class LLMService:
             
             # Post-process: ensure answer doesn't violate rules
             if not self._validate_answer(answer, context):
-                return "پاسخی برای این سوال ندارم"
+                return "در منابع موجود نیست"
             
             return answer
             
@@ -145,6 +165,7 @@ class LLMService:
         
         # If answer is the refusal message, it's valid
         refusal_indicators = [
+            "در منابع موجود نیست",
             "پاسخی برای این سوال ندارم",
             "موجود نیست",
             "پایگاه دانش",

@@ -49,48 +49,12 @@ async def chat(
             ChatLog.session_id == session_id
         ).first() is None
         
-        # Check for intent match (always check for logging purposes)
+        # Check for intent match (for logging only - not used for answering)
         matched_intent = IntentMatcherService.match_intent(db, request.message)
         intent_name = matched_intent.name if matched_intent else None
         
-        # If intent matched, return intent response directly without calling OpenAI
-        if matched_intent:
-            logger.info(
-                "Intent matched",
-                extra={
-                    "session_id": session_id,
-                    "intent_name": matched_intent.name,
-                    "user_message": request.message[:100],
-                }
-            )
-            
-            # Prepare response - include greeting if new session
-            response_message = matched_intent.response
-            if is_new_session:
-                response_message = f"{settings.GREETING_MESSAGE}\n\n{response_message}"
-            
-            # Return intent response directly without calling OpenAI
-            chat_log = ChatLog(
-                session_id=session_id,
-                user_message=request.message,
-                bot_message=response_message,
-                sources_json={"kb_ids": [], "website_page_ids": []},
-                refused="false",
-                intent=intent_name
-            )
-            db.add(chat_log)
-            db.commit()
-            
-            return ChatResponse(
-                session_id=session_id,
-                answer=response_message,
-                sources=[],
-                refused=False,
-                openai_called=False,
-                debug={"intent_matched": matched_intent.name} if settings.ENV == "development" else None
-            )
-        
-        # Retrieve relevant sources (only if no intent matched)
+        # STRICT: Bot only answers from KB or website sources, never from intents
+        # Retrieve relevant sources
         retrieval_result = RetrievalService.retrieve_all(db, request.message)
         
         # Collect retrieval hits for metering
@@ -128,11 +92,18 @@ async def chat(
                 refusal_with_greeting = refusal_message
                 refused = True
             
+            # Build sources JSON for refusal (empty sources)
+            sources_json = {
+                "kb_ids": [],
+                "website_page_ids": [],
+                "sources": []
+            }
+            
             chat_log = ChatLog(
                 session_id=session_id,
                 user_message=request.message,
                 bot_message=refusal_with_greeting,
-                sources_json={"kb_ids": [], "website_page_ids": []},
+                sources_json=sources_json,
                 refused="true" if refused else "false",
                 intent=intent_name
             )
@@ -167,21 +138,27 @@ async def chat(
         # Build context from retrieved sources
         context = AnswerGuardService.build_context(retrieval_result)
         
-        # Build source info list
+        # Build source info list with scores and snippets
         sources = []
-        for kb_item, _ in retrieval_result["kb_results"]:
+        for kb_item, score in retrieval_result["kb_results"]:
             sources.append(SourceInfo(
                 type="kb",
                 id=kb_item.id,
-                title=kb_item.question
+                title=kb_item.question,
+                snippet=kb_item.answer[:200] if kb_item.answer else None,  # First 200 chars as snippet
+                score=round(score, 3)
             ))
         
-        for page, _ in retrieval_result["website_results"]:
+        for page, score in retrieval_result["website_results"]:
+            # Extract snippet from content (first 200 chars)
+            snippet = page.content_text[:200] if page.content_text else None
             sources.append(SourceInfo(
-                type="website",
+                type="web",
                 id=page.id,
                 title=page.title,
-                url=page.url
+                url=page.url,
+                snippet=snippet,
+                score=round(score, 3)
             ))
         
         # Generate answer using LLM
@@ -203,8 +180,21 @@ async def chat(
         if is_new_session:
             answer = f"{settings.GREETING_MESSAGE}\n\n{answer}"
         
-        # Extract source IDs for logging
-        source_ids = AnswerGuardService.extract_source_ids(retrieval_result)
+        # Build sources JSON for logging (include all source info)
+        sources_json = {
+            "kb_ids": [s.id for s in sources if s.type == "kb"],
+            "website_page_ids": [s.id for s in sources if s.type == "web"],
+            "sources": [
+                {
+                    "type": s.type,
+                    "id": s.id,
+                    "title": s.title,
+                    "url": s.url,
+                    "score": s.score
+                }
+                for s in sources
+            ]
+        }
         
         # Log the chat with metering info
         logger.info(
@@ -215,6 +205,7 @@ async def chat(
                 "retrieval_hits": retrieval_hits,
                 "answer_length": len(answer),
                 "sources_count": len(sources),
+                "refused": False,
             }
         )
         
@@ -222,7 +213,7 @@ async def chat(
             session_id=session_id,
             user_message=request.message,
             bot_message=answer,
-            sources_json=source_ids,
+            sources_json=sources_json,
             refused="false",
             intent=intent_name
         )

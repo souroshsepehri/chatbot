@@ -13,140 +13,17 @@ import sys
 
 
 def seed_qa_items(db: Session):
-    """Seed QA items"""
-    qa_data = [
-        {
-            "question": "ساعات کاری شما چیست؟",
-            "answer": "ساعات کاری ما از شنبه تا پنجشنبه از ساعت 9 صبح تا 6 عصر است. جمعه‌ها تعطیل می‌باشیم."
-        },
-        {
-            "question": "آدرس دفتر مرکزی کجاست؟",
-            "answer": "دفتر مرکزی ما در تهران، خیابان ولیعصر، پلاک 1234 واقع شده است."
-        },
-        {
-            "question": "چطور می‌توانم با شما تماس بگیرم؟",
-            "answer": "می‌توانید از طریق شماره تلفن 021-12345678 یا ایمیل info@example.com با ما تماس بگیرید."
-        },
-        {
-            "question": "آیا امکان بازدید از دفتر وجود دارد؟",
-            "answer": "بله، با هماهنگی قبلی می‌توانید از دفتر ما بازدید کنید. لطفاً از طریق ایمیل یا تلفن هماهنگی کنید."
-        },
-        {
-            "question": "شما چه نوع شرکتی هستید؟",
-            "answer": "ما یک شرکت فناوری اطلاعات هستیم که در زمینه توسعه نرم‌افزار و راه‌حل‌های هوشمند فعالیت می‌کنیم."
-        },
-        {
-            "question": "چه خدماتی ارائه می‌دهید؟",
-            "answer": "ما خدمات توسعه نرم‌افزار، طراحی وب‌سایت، اپلیکیشن موبایل و مشاوره فناوری اطلاعات ارائه می‌دهیم."
-        },
-        {
-            "question": "قیمت خدمات شما چقدر است؟",
-            "answer": "قیمت خدمات بسته به نوع پروژه و نیازهای شما متفاوت است. لطفاً برای دریافت قیمت دقیق با ما تماس بگیرید."
-        },
-        {
-            "question": "آیا گارانتی برای خدمات شما وجود دارد؟",
-            "answer": "بله، تمام خدمات ما دارای گارانتی و پشتیبانی پس از تحویل می‌باشند. مدت زمان گارانتی بسته به نوع خدمت متفاوت است."
-        },
-        {
-            "question": "چقدر طول می‌کشد تا پروژه تحویل داده شود؟",
-            "answer": "زمان تحویل پروژه بسته به پیچیدگی و حجم کار متفاوت است. معمولاً بین 2 تا 8 هفته برای پروژه‌های متوسط."
-        },
-        {
-            "question": "آیا امکان سفارشی‌سازی وجود دارد؟",
-            "answer": "بله، تمام خدمات ما قابل سفارشی‌سازی بر اساس نیازهای خاص شما می‌باشند."
-        },
-        {
-            "question": "چه روش‌های پرداختی را می‌پذیرید؟",
-            "answer": "ما پرداخت نقدی، چک، کارت‌های بانکی و پرداخت آنلاین را می‌پذیریم."
-        },
-        {
-            "question": "آیا امکان پرداخت اقساطی وجود دارد؟",
-            "answer": "بله، برای پروژه‌های بزرگ امکان پرداخت اقساطی وجود دارد. جزئیات را می‌توانید با تیم فروش ما در میان بگذارید."
-        },
-        {
-            "question": "چطور می‌توانم از پشتیبانی فنی استفاده کنم؟",
-            "answer": "می‌توانید از طریق تیکت سیستم، ایمیل support@example.com یا تماس تلفنی با تیم پشتیبانی در ارتباط باشید."
-        },
-        {
-            "question": "ساعات پشتیبانی فنی چیست؟",
-            "answer": "پشتیبانی فنی ما در ساعات اداری (9 صبح تا 6 عصر) و همچنین 24/7 برای مشتریان VIP در دسترس است."
-        },
-        {
-            "question": "اگر مشکلی پیش آمد چطور باید گزارش دهم؟",
-            "answer": "می‌توانید مشکل را از طریق تیکت سیستم، ایمیل یا تماس تلفنی گزارش دهید. تیم ما در اسرع وقت پاسخ می‌دهد."
-        },
-        {
-            "question": "آیا آموزش استفاده از محصولات ارائه می‌دهید؟",
-            "answer": "بله، ما آموزش‌های کامل و مستندات جامع برای تمام محصولات خود ارائه می‌دهیم."
-        },
-        {
-            "question": "چقدر طول می‌کشد تا مشکل حل شود؟",
-            "answer": "زمان حل مشکل بسته به نوع و پیچیدگی آن متفاوت است. مشکلات ساده معمولاً در همان روز و مشکلات پیچیده‌تر در حداکثر 3 روز کاری حل می‌شوند."
-        },
-        {
-            "question": "آیا اطلاعات من امن است؟",
-            "answer": "بله، ما از بالاترین استانداردهای امنیتی برای محافظت از اطلاعات شما استفاده می‌کنیم."
-        },
-        {
-            "question": "آیا می‌توانم پروژه را لغو کنم؟",
-            "answer": "بله، امکان لغو پروژه وجود دارد. جزئیات شرایط لغو در قرارداد شما ذکر شده است."
-        },
-        {
-            "question": "آیا امکان بازگشت وجه وجود دارد؟",
-            "answer": "بله، در صورت عدم رضایت از خدمات، امکان بازگشت وجه طبق شرایط قرارداد وجود دارد."
-        },
-        {
-            "question": "چطور می‌توانم از آخرین اخبار و به‌روزرسانی‌ها مطلع شوم؟",
-            "answer": "می‌توانید در خبرنامه ما عضو شوید یا ما را در شبکه‌های اجتماعی دنبال کنید تا از آخرین اخبار مطلع شوید."
-        },
-    ]
-    
-    created_count = 0
-    skipped_count = 0
-    
-    for qa in qa_data:
-        # Check if QA already exists
-        existing = db.query(KBQA).filter(
-            KBQA.question == qa["question"]
-        ).first()
-        
-        if existing:
-            skipped_count += 1
-            print(f"  - Skipped existing QA: {qa['question'][:50]}...")
-        else:
-            qa_item = KBQA(
-                question=qa["question"],
-                answer=qa["answer"]
-            )
-            db.add(qa_item)
-            created_count += 1
-            print(f"  ✓ Created QA: {qa['question'][:50]}...")
-    
-    print(f"\n✓ Created {created_count} QA items, skipped {skipped_count} existing")
-    return created_count
+    """Seed QA items - returns 0 (no demo data seeded)"""
+    # No demo data - start with empty KB
+    print("  - No demo QA items seeded (starting with empty KB)")
+    return 0
 
 
 def seed_website_source(db: Session):
-    """Seed a fake disabled website source"""
-    fake_url = "https://example-demo-site.com"
-    
-    # Check if already exists
-    existing = db.query(WebsiteSource).filter(
-        WebsiteSource.base_url == fake_url
-    ).first()
-    
-    if existing:
-        print(f"✓ Website source '{fake_url}' already exists")
-        return existing
-    else:
-        website_source = WebsiteSource(
-            base_url=fake_url,
-            enabled=False,  # Disabled as requested
-            crawl_status="idle"
-        )
-        db.add(website_source)
-        print(f"✓ Created fake website source: {fake_url} (disabled)")
-        return website_source
+    """Seed website source - returns None (no demo data seeded)"""
+    # No demo data - start with empty website sources
+    print("  - No demo website sources seeded (starting with empty sources)")
+    return None
 
 
 def main():
