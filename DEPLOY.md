@@ -1,19 +1,17 @@
-# Production Deployment Guide - Subdomain with Nginx + SSL
+# Production Deployment Guide - chatbot.zimmerai.com
 
-This guide provides step-by-step instructions for deploying the chatbot application on a subdomain using Nginx as a reverse proxy with SSL/TLS encryption.
+This guide provides step-by-step instructions for deploying the chatbot application on `chatbot.zimmerai.com` using Nginx as a reverse proxy with SSL/TLS encryption.
 
 ## Prerequisites
 
 - Ubuntu/Debian server with root or sudo access
-- Domain name with DNS access
 - PM2 processes already running:
   - Frontend: `http://127.0.0.1:3000` (PM2: `chatbot-frontend`)
   - Backend: `http://127.0.0.1:8000` (PM2: `chatbot-backend`)
 
-## Placeholders
+## Placeholder
 
-Replace these placeholders throughout this guide:
-- `<SUBDOMAIN>` - Your subdomain (e.g., `chatbot.example.com`)
+Replace this placeholder:
 - `<EMAIL>` - Your email address for Let's Encrypt notifications
 
 ---
@@ -32,24 +30,23 @@ curl -s ifconfig.me
 
 ### A.2. Verify Subdomain DNS Resolution
 
-You must verify that your subdomain resolves to your server's public IP. Use one or both of these methods:
+Check that `chatbot.zimmerai.com` resolves to your server's public IP:
 
-**Option 1: Using `getent`**
 ```bash
-getent hosts <SUBDOMAIN>
+getent hosts chatbot.zimmerai.com
 ```
 
-**Option 2: Using `dig`**
+**Alternative using dig:**
 ```bash
-dig +short <SUBDOMAIN>
+dig +short chatbot.zimmerai.com
 ```
 
 **Example output:**
 ```
-# getent hosts chatbot.example.com
-203.0.113.42    chatbot.example.com
+# getent hosts chatbot.zimmerai.com
+203.0.113.42    chatbot.zimmerai.com
 
-# dig +short chatbot.example.com
+# dig +short chatbot.zimmerai.com
 203.0.113.42
 ```
 
@@ -59,7 +56,7 @@ dig +short <SUBDOMAIN>
 
 ```bash
 SERVER_IP=$(curl -s ifconfig.me)
-RESOLVED_IP=$(dig +short <SUBDOMAIN> | head -n1)
+RESOLVED_IP=$(dig +short chatbot.zimmerai.com | head -n1)
 
 echo "Server IP: $SERVER_IP"
 echo "Resolved IP: $RESOLVED_IP"
@@ -68,12 +65,12 @@ if [ "$SERVER_IP" = "$RESOLVED_IP" ]; then
     echo "✅ DNS is correctly configured"
 else
     echo "❌ ERROR: DNS mismatch!"
-    echo "The subdomain <SUBDOMAIN> resolves to $RESOLVED_IP"
+    echo "The subdomain chatbot.zimmerai.com resolves to $RESOLVED_IP"
     echo "But your server IP is $SERVER_IP"
     echo ""
     echo "STOP HERE and fix your DNS A record:"
     echo "  - Go to your domain DNS settings"
-    echo "  - Create/update A record: <SUBDOMAIN> -> $SERVER_IP"
+    echo "  - Create/update A record: chatbot.zimmerai.com -> $SERVER_IP"
     echo "  - Wait for DNS propagation (can take up to 48 hours)"
     echo "  - Re-run this verification before proceeding"
     exit 1
@@ -93,11 +90,8 @@ sudo apt update
 # Install Nginx
 sudo apt install -y nginx
 
-# Enable Nginx to start on boot
-sudo systemctl enable nginx
-
-# Start Nginx service
-sudo systemctl start nginx
+# Enable and start Nginx
+sudo systemctl enable --now nginx
 
 # Verify Nginx is running
 sudo systemctl status nginx
@@ -107,36 +101,24 @@ sudo systemctl status nginx
 
 ## Step C: Apply Nginx Configuration
 
-### C.1. Copy Configuration Template
+### C.1. Copy Configuration File
 
 ```bash
-# Copy the subdomain config template
-sudo cp deploy/nginx/chatbot-subdomain.conf /etc/nginx/sites-available/<SUBDOMAIN>
+# Copy the config file
+sudo cp deploy/nginx/chatbot.zimmerai.com.conf /etc/nginx/sites-available/chatbot.zimmerai.com
 ```
 
-### C.2. Replace Placeholders
-
-```bash
-# Edit the config file
-sudo nano /etc/nginx/sites-available/<SUBDOMAIN>
-```
-
-**Replace all occurrences of `<SUBDOMAIN>` with your actual subdomain:**
-- `server_name <SUBDOMAIN>;` → `server_name chatbot.example.com;`
-
-**Save and exit** (Ctrl+X, then Y, then Enter).
-
-### C.3. Enable the Site
+### C.2. Enable the Site
 
 ```bash
 # Create symlink to enable the site
-sudo ln -s /etc/nginx/sites-available/<SUBDOMAIN> /etc/nginx/sites-enabled/
+sudo ln -sf /etc/nginx/sites-available/chatbot.zimmerai.com /etc/nginx/sites-enabled/chatbot.zimmerai.com
 
 # Remove default Nginx site (optional, but recommended)
-sudo rm /etc/nginx/sites-enabled/default
+sudo rm -f /etc/nginx/sites-enabled/default
 ```
 
-### C.4. Test and Reload Nginx
+### C.3. Test and Reload Nginx
 
 ```bash
 # Test Nginx configuration for syntax errors
@@ -169,12 +151,12 @@ sudo apt install -y certbot python3-certbot-nginx
 
 ```bash
 # Obtain SSL certificate (certbot will automatically configure Nginx)
-sudo certbot --nginx -d <SUBDOMAIN> -m <EMAIL> --agree-tos --redirect
+sudo certbot --nginx -d chatbot.zimmerai.com -m <EMAIL> --agree-tos --redirect
 ```
 
 **Example:**
 ```bash
-sudo certbot --nginx -d chatbot.example.com -m admin@example.com --agree-tos --redirect
+sudo certbot --nginx -d chatbot.zimmerai.com -m admin@zimmerai.com --agree-tos --redirect
 ```
 
 **What this does:**
@@ -193,7 +175,7 @@ sudo certbot renew --dry-run
 **Expected output:**
 ```
 Congratulations, all renewals succeeded. The following certs have been renewed:
-  /etc/letsencrypt/live/<SUBDOMAIN>/fullchain.pem (success)
+  /etc/letsencrypt/live/chatbot.zimmerai.com/fullchain.pem (success)
 ```
 
 **Note:** Certbot automatically sets up a systemd timer for renewal. Verify it's enabled:
@@ -205,27 +187,19 @@ sudo systemctl status certbot.timer
 
 ## Step E: Firewall Hardening with UFW (Optional but Recommended)
 
-**Important:** Backend and frontend already bind to `127.0.0.1`, but firewall provides additional security.
+**Important:** Backend and frontend already bind to `127.0.0.1`, so ports 3000/8000 are not publicly reachable anyway. Firewall provides additional security.
 
 ### E.1. Configure UFW Rules
 
 ```bash
-# Check current UFW status
-sudo ufw status
-
 # Allow OpenSSH (CRITICAL - do this first!)
 sudo ufw allow OpenSSH
 
 # Allow Nginx (HTTP and HTTPS)
 sudo ufw allow 'Nginx Full'
 
-# Explicitly deny direct access to application ports
-# (Services bind to 127.0.0.1 anyway, but explicit deny for safety)
-sudo ufw deny 3000
-sudo ufw deny 8000
-
 # Enable firewall
-sudo ufw enable
+sudo ufw --force enable
 
 # Verify rules
 sudo ufw status numbered
@@ -234,8 +208,7 @@ sudo ufw status numbered
 **Expected firewall rules:**
 - ✅ OpenSSH (port 22) - allowed
 - ✅ Nginx Full (ports 80, 443) - allowed
-- ❌ Port 3000 - denied (frontend only accessible via Nginx)
-- ❌ Port 8000 - denied (backend only accessible via Nginx)
+- Note: Ports 3000/8000 are not publicly reachable (bind to 127.0.0.1)
 
 ---
 
@@ -245,20 +218,20 @@ sudo ufw status numbered
 
 ```bash
 # Check HTTP redirects to HTTPS
-curl -I http://<SUBDOMAIN>
+curl -I http://chatbot.zimmerai.com
 ```
 
 **Expected output:**
 ```
 HTTP/1.1 301 Moved Permanently
-Location: https://<SUBDOMAIN>/
+Location: https://chatbot.zimmerai.com/
 ```
 
 ### F.2. Verify HTTPS Frontend
 
 ```bash
 # Check HTTPS frontend
-curl -I https://<SUBDOMAIN>
+curl -I https://chatbot.zimmerai.com
 ```
 
 **Expected output:**
@@ -266,7 +239,7 @@ curl -I https://<SUBDOMAIN>
 HTTP/2 200
 ...
 X-Content-Type-Options: nosniff
-X-Frame-Options: SAMEORIGIN
+X-Frame-Options: DENY
 Referrer-Policy: strict-origin-when-cross-origin
 Strict-Transport-Security: max-age=31536000; includeSubDomains
 ```
@@ -275,7 +248,7 @@ Strict-Transport-Security: max-age=31536000; includeSubDomains
 
 ```bash
 # Check backend health endpoint via Nginx
-curl -I https://<SUBDOMAIN>/api/health
+curl -I https://chatbot.zimmerai.com/api/health
 ```
 
 **Expected output:**
@@ -305,13 +278,13 @@ pm2 status
 
 ```bash
 # Test frontend
-curl https://<SUBDOMAIN>
+curl https://chatbot.zimmerai.com
 
 # Test backend API
-curl https://<SUBDOMAIN>/api/health
+curl https://chatbot.zimmerai.com/api/health
 
 # Test chat endpoint (should return JSON)
-curl -X POST https://<SUBDOMAIN>/api/chat \
+curl -X POST https://chatbot.zimmerai.com/api/chat \
   -H "Content-Type: application/json" \
   -d '{"message": "test"}'
 ```
@@ -381,13 +354,13 @@ sudo netstat -tulpn | grep -E ':(3000|8000)'
 
 ```bash
 # Verify DNS resolution from server
-dig +short <SUBDOMAIN>
+dig +short chatbot.zimmerai.com
 
 # Check DNS from external location
 # Use online tools like: https://dnschecker.org
 
 # Verify DNS propagation
-dig <SUBDOMAIN> @8.8.8.8
+dig chatbot.zimmerai.com @8.8.8.8
 ```
 
 ---
@@ -398,7 +371,7 @@ dig <SUBDOMAIN> @8.8.8.8
 - ✅ Nginx configured with security headers
 - ✅ SSL certificate installed and auto-renewal configured
 - ✅ HTTP redirects to HTTPS
-- ✅ Firewall (UFW) configured to deny ports 3000/8000
+- ✅ Firewall (UFW) configured to allow only ports 22, 80, 443
 - ✅ Backend and frontend bind to 127.0.0.1 (not 0.0.0.0)
 - ✅ PM2 processes running and healthy
 - ✅ All proxy headers correctly set (X-Real-IP, X-Forwarded-For, etc.)
@@ -424,7 +397,7 @@ pm2 restart all
 
 # Verify services
 pm2 status
-curl https://<SUBDOMAIN>/api/health
+curl https://chatbot.zimmerai.com/api/health
 ```
 
 ### Renew SSL Certificate Manually
@@ -458,7 +431,7 @@ tail -f apps/backend/logs/app.log
 
 ```bash
 # Check DNS
-dig +short <SUBDOMAIN>
+dig +short chatbot.zimmerai.com
 
 # Test Nginx config
 sudo nginx -t
@@ -485,4 +458,4 @@ sudo tail -f /var/log/nginx/error.log
 - **WebSocket support**: Nginx configuration includes WebSocket upgrade headers for Next.js and chat functionality
 - **Timeouts**: Backend API has 120s timeouts for LLM chat requests; frontend has 60s timeouts
 - **Security headers**: X-Content-Type-Options, X-Frame-Options, Referrer-Policy, and HSTS are configured
-- **Gzip**: Disabled by default in the configuration (can be enabled if needed)
+- **X-Frame-Options**: Set to DENY for maximum security (prevents iframe embedding)
