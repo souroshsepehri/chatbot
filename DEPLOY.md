@@ -22,11 +22,22 @@ Replace this placeholder:
 
 ### A.1. Determine Server Public IP
 
+**Recommended: Use your cloud provider's control panel as the source of truth for your server's public IPv4 address.**
+
+**Alternative methods (if provider panel unavailable):**
+
+**Option 1: Get default route interface IP (may show NAT IP):**
 ```bash
-curl -s ifconfig.me
+ip route get 1.1.1.1 | awk '{print $7; exit}'
 ```
 
-**Save this IP address** - you'll need it for DNS verification.
+**Option 2: Show all local IPs (interpret carefully):**
+```bash
+hostname -I
+```
+*Note: This shows all local IP addresses. The first IPv4 address is typically the primary interface, but may be a private IP if behind NAT.*
+
+**⚠️ Important:** For Let's Encrypt SSL certificate validation, the DNS A record must point to the server's **public IPv4 address** as shown in your cloud provider's control panel (AWS, DigitalOcean, Linode, etc.). If your server is behind NAT, use the public IP assigned by your provider, not the private IP.
 
 ### A.2. Verify Subdomain DNS Resolution
 
@@ -52,32 +63,38 @@ dig +short chatbot.zimmerai.com
 
 ### A.3. DNS Verification Check
 
-**Compare the resolved IP with your server's public IP:**
+**Compare the resolved IP with your server's public IP from the provider panel:**
 
 ```bash
-SERVER_IP=$(curl -s ifconfig.me)
+# Get resolved IP from DNS
 RESOLVED_IP=$(dig +short chatbot.zimmerai.com | head -n1)
 
-echo "Server IP: $SERVER_IP"
 echo "Resolved IP: $RESOLVED_IP"
-
-if [ "$SERVER_IP" = "$RESOLVED_IP" ]; then
-    echo "✅ DNS is correctly configured"
-else
-    echo "❌ ERROR: DNS mismatch!"
-    echo "The subdomain chatbot.zimmerai.com resolves to $RESOLVED_IP"
-    echo "But your server IP is $SERVER_IP"
-    echo ""
-    echo "STOP HERE and fix your DNS A record:"
-    echo "  - Go to your domain DNS settings"
-    echo "  - Create/update A record: chatbot.zimmerai.com -> $SERVER_IP"
-    echo "  - Wait for DNS propagation (can take up to 48 hours)"
-    echo "  - Re-run this verification before proceeding"
-    exit 1
-fi
+echo ""
+echo "Compare this with your server's public IPv4 from your cloud provider panel."
+echo "If they don't match, STOP and fix your DNS A record."
 ```
 
-**⚠️ If resolved IP != server IP, STOP and fix DNS A record before continuing.**
+**Manual verification:**
+1. Check your cloud provider's control panel for the server's public IPv4 address
+2. Compare it with the resolved IP from DNS
+3. If they match: ✅ DNS is correctly configured
+4. If they don't match: ❌ Fix your DNS A record before proceeding
+
+**⚠️ If resolved IP != server public IP, STOP and fix DNS A record before continuing.**
+
+### A.4. Special Cases: NAT and Cloudflare Proxy
+
+**If behind NAT:**
+- Use the public IP shown in your cloud provider panel (not the private IP)
+- The DNS A record must point to this public IP
+- Let's Encrypt will validate against this public IP
+
+**If using Cloudflare (or similar proxy):**
+- **For Let's Encrypt SSL:** The DNS A record must be set to **DNS only** (gray cloud, not proxied/orange cloud)
+  - Proxied DNS (orange cloud) hides your server IP and will cause Let's Encrypt validation to fail
+  - After SSL is set up, you can optionally enable proxying, but initial SSL setup requires DNS-only mode
+- Verify DNS-only mode: `dig +short chatbot.zimmerai.com` should return your server's public IP, not Cloudflare's IPs
 
 ---
 
